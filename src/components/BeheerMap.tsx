@@ -168,10 +168,38 @@ export default function BeheerMap({ sessions, isLarge = false }: BeheerMapProps)
 
     mapInstanceRef.current = map;
 
-    // Use a premium Dark Mode tile layer that beautifully labels countries, cities, and streets in detail
-    L.tileLayer('https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png', {
-      maxZoom: 19,
-    }).addTo(map);
+    // Use the 100% free OpenStreetMap dark luxury layer (same as PaulvanGeenen.nl) - no API key watermarks!
+    const cartoKey = typeof window !== 'undefined' ? (localStorage.getItem('carto_api_key') || '') : '';
+    if (cartoKey) {
+      L.tileLayer(`https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png?api_key=${encodeURIComponent(cartoKey)}`, {
+        maxZoom: 19,
+        attribution: '&copy; OpenStreetMap &copy; CARTO',
+      }).addTo(map);
+    } else {
+      L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+        maxZoom: 19,
+        className: 'map-tiles-dark-luxury',
+        attribution: '&copy; OpenStreetMap contributors',
+      }).addTo(map);
+    }
+
+    // Inject specialized dark luxury CSS filter so OpenStreetMap renders in gorgeous dark mode without watermarks
+    const cssStyleId = 'leaflet-custom-dark-luxury-tiles';
+    let styleTag = document.getElementById(cssStyleId);
+    if (!styleTag) {
+      styleTag = document.createElement('style');
+      styleTag.id = cssStyleId;
+      document.head.appendChild(styleTag);
+    }
+    styleTag.innerHTML = `
+      .leaflet-container {
+        background: #0f0f0f !important;
+      }
+      .leaflet-tile-pane .map-tiles-dark-luxury {
+        filter: invert(100%) hue-rotate(180deg) brightness(85%) contrast(92%) !important;
+        background: #0d0d0d !important;
+      }
+    `;
 
     // Create a layer group to hold our custom glowing visitor markers
     const markersLayer = L.layerGroup().addTo(map);
