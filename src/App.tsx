@@ -17,6 +17,8 @@ import Footer from './components/Footer';
 import BeheerDashboard from './components/BeheerDashboard';
 import TrackerManager from './components/TrackerManager';
 import { db, collection, getDocs, query, where, limit } from './lib/firebase';
+import { filterActiveAgendaItems } from './lib/agendaFilter';
+import { AgendaItem } from './types';
 
 function MainContent({ showAgenda }: { showAgenda: boolean }) {
   return (
@@ -44,17 +46,16 @@ function RoutesWrapper() {
   const location = useLocation();
 
   const checkAgenda = async () => {
-    // Check if there are active agenda items
     try {
-      console.log('[App] Checking agenda items via Firestore...');
       const q = query(
         collection(db, 'agenda'), 
         where('isVisible', '==', true),
         limit(1)
       );
       const snapshot = await getDocs(q);
-      console.log(`[App] Agenda presence: ${!snapshot.empty}`);
-      setHasItems(!snapshot.empty);
+      const raw = snapshot.docs.map(doc => ({ ...doc.data() } as AgendaItem));
+      const activeItems = filterActiveAgendaItems(raw);
+      setHasItems(activeItems.length > 0);
     } catch (err) {
       console.error('[App] Check agenda error:', err);
       setHasItems(false);

@@ -3,6 +3,7 @@ import { motion } from 'motion/react';
 import { Calendar, Ticket, MapPin, ExternalLink } from 'lucide-react';
 import { AgendaItem } from '../types';
 import { db, collection, onSnapshot, query, orderBy, where } from '../lib/firebase';
+import { filterActiveAgendaItems } from '../lib/agendaFilter';
 import { trackButtonPress } from '../lib/tracker';
 
 export default function Agenda() {
@@ -10,9 +11,6 @@ export default function Agenda() {
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    console.log('[Agenda] Setting up Firestore listener...');
-    
-    // Query items that are visible
     const q = query(
       collection(db, 'agenda'),
       where('isVisible', '==', true),
@@ -20,19 +18,18 @@ export default function Agenda() {
     );
 
     const unsubscribe = onSnapshot(q, (snapshot) => {
-      const data = snapshot.docs.map(doc => ({ ...doc.data() } as AgendaItem));
-      console.log(`[Agenda] Received ${data.length} items from Firestore`);
-      setAgenda(data);
+      const raw = snapshot.docs.map(doc => ({ ...doc.data() } as AgendaItem));
+      setAgenda(filterActiveAgendaItems(raw));
       setLoading(false);
     }, (err) => {
-      console.error('[Agenda] Firestore subscription error:', err);
+      console.error('[Agenda] Database subscription error:', err);
       setLoading(false);
     });
 
     return () => unsubscribe();
   }, []);
 
-  if (loading) return null;
+  if (loading || agenda.length === 0) return null;
 
   return (
     <section id="agenda" className="py-24 bg-gradient-to-b from-[#1a0033] to-deep-black">

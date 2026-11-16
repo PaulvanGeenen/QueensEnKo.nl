@@ -50,7 +50,7 @@ interface SubscriberData {
 export default function BeheerDashboard() {
   const [password, setPassword] = useState('');
   const [isAuthorized, setIsAuthorized] = useState(false);
-  const [isFirestoreConnected, setIsFirestoreConnected] = useState(false);
+  const [isFirestoreConnected, setIsFirestoreConnected] = useState(true);
 
   // Always force a fresh login by clearing any stored auth status on mount
   useEffect(() => {
@@ -807,14 +807,14 @@ export default function BeheerDashboard() {
                 {isFirestoreConnected ? (
                   <>
                     <span className="w-2 h-2 rounded-full bg-green-500 animate-pulse" />
-                    <span className="text-[10px] text-zinc-500 font-mono uppercase tracking-widest">Live Gekoppeld met Firestore</span>
+                    <span className="text-[10px] text-zinc-500 font-mono uppercase tracking-widest">Live Gekoppeld met TransIP MySQL</span>
                     <button
                       onClick={() => {
                         setIsFirestoreConnected(false);
                         setError('');
                       }}
                       className="text-[10px] text-red-500 hover:underline font-mono uppercase tracking-wider ml-1"
-                      title="Verbreek live verbinding om dataverbruik te besparen"
+                      title="Verbreek live verbinding"
                     >
                       (Verbreek)
                     </button>
@@ -826,21 +826,16 @@ export default function BeheerDashboard() {
                     <button
                       onClick={() => setIsFirestoreConnected(true)}
                       className="px-2 py-0.5 bg-royal-gold/15 hover:bg-royal-gold text-royal-gold hover:text-black border border-royal-gold/30 rounded text-[9px] font-mono uppercase tracking-wider ml-1 transition-all"
-                      title="Klik om verbinding te maken met de live Firestore database"
+                      title="Klik om verbinding te maken met de TransIP MySQL database"
                     >
                       Verbinden
                     </button>
                   </>
                 )}
                 <span className="text-zinc-700">•</span>
-                <a
-                  href="https://console.firebase.google.com/project/gen-lang-client-0268572427/firestore/databases/ai-studio-8fa94661-3c47-4c5a-8cbc-b0744d9be9f3/data"
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  className="text-[10px] text-royal-gold hover:underline font-mono uppercase tracking-wider flex items-center gap-1"
-                >
-                  <Database size={10} /> Firebase Console
-                </a>
+                <span className="text-[10px] text-zinc-500 font-mono uppercase tracking-wider flex items-center gap-1">
+                  <Database size={10} className="text-royal-gold" /> paulw6_QueensEnKo
+                </span>
                 <span className="text-zinc-700">•</span>
                 <button 
                   onClick={handleLogout}
@@ -921,26 +916,14 @@ export default function BeheerDashboard() {
                     <Database size={20} />
                   </div>
                   <div className="space-y-1">
-                    <h4 className="text-amber-500 font-bold text-sm">Firestore Database Quota Overschreden</h4>
+                    <h4 className="text-amber-500 font-bold text-sm">Databaseverbinding tijdelijk onderbroken</h4>
                     <p className="text-zinc-300 text-xs leading-relaxed">
-                      De database heeft zijn gratis dagelijkse limiet bereikt. 
-                      Firestore blokkeert tijdelijk verdere REST-aanvragen om onverwachte kosten te voorkomen.
+                      De verbinding met de TransIP MySQL-database gaf een tijdelijke fout. Klik hieronder om opnieuw te verbinden.
                     </p>
                   </div>
                 </div>
                 
                 <div className="pl-11 space-y-3">
-                  <div className="p-4 bg-amber-500/5 border border-amber-500/25 rounded-xl text-xs text-zinc-300 space-y-2 leading-relaxed">
-                    <p className="font-bold text-amber-500">💳 Heeft u zojuist de database geüpgraded of betaald?</p>
-                    <p>
-                      Super! Uw upgrade naar het <strong>Blaze-abonnement (Pay-as-you-go)</strong> heft de harde limieten direct op. 
-                      Houd er rekening mee dat Google Cloud <strong>5 tot 15 minuten</strong> nodig heeft om de betalings- en factureringsstatus door te voeren in alle wereldwijde servers van Firestore.
-                    </p>
-                    <p>
-                      Zodra Google de status heeft bijgewerkt, is de blokkade volledig opgeheven. Klik hieronder op <strong>Opnieuw Verbinden</strong> om de live verbinding opnieuw te testen.
-                    </p>
-                  </div>
-
                   <div className="pt-2 flex flex-wrap gap-3">
                     <button
                       onClick={() => {
@@ -954,14 +937,6 @@ export default function BeheerDashboard() {
                     >
                       <Database size={13} /> Opnieuw Verbinden (Hertesten)
                     </button>
-                    <a
-                      href="https://console.firebase.google.com/project/gen-lang-client-0268572427/firestore/usage"
-                      target="_blank"
-                      rel="noopener noreferrer"
-                      className="px-4 py-2 bg-zinc-900 hover:bg-zinc-800 text-zinc-300 font-extrabold text-[11px] rounded-xl border border-zinc-800 transition-all uppercase tracking-wider flex items-center gap-1.5"
-                    >
-                      Bekijk Verbruik in Console
-                    </a>
                   </div>
                 </div>
               </div>
@@ -2237,7 +2212,7 @@ export default function BeheerDashboard() {
                           Verzamelt statistieken zoals steden, apparaten, besturingssystemen en kliks, en voegt deze samen met bestaande dagsamenvattingen.
                         </li>
                         <li>
-                          <strong className="text-red-400">Verwijdert vervolgens de raw individuele sessies</strong> uit de database om de Firestore databasegroei te beperken en uw beheeromgeving razendsnel te houden.
+                          <strong className="text-red-400">Verwijdert vervolgens de raw individuele sessies</strong> uit de database om de MySQL-databasegroei te beperken en uw beheeromgeving razendsnel te houden.
                         </li>
                       </ul>
                     </div>
