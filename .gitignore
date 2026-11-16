@@ -1,0 +1,16 @@
+node_modules/
+build/
+dist/
+coverage/
+.local_db/
+.DS_Store
+Thumbs.db
+*.log
+.env*
+!.env.example
+
+# TransIP database & SFTP geheimen (NOOIT committen)
+public/api/config.php
+firebase-applet-config.json
+*_import.sql
+*_backup.json

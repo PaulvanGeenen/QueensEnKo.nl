@@ -1,0 +1,147 @@
+@import url('https://fonts.googleapis.com/css2?family=Playfair+Display:ital,wght@0,400;0,700;0,900;1,400&family=Outfit:wght@300;400;600&display=swap');
+@import "tailwindcss";
+
+@theme {
+  --font-sans: "Outfit", ui-sans-serif, system-ui, sans-serif;
+  --font-display: "Playfair Display", serif;
+  
+  --color-royal-purple: #4b0082;
+  --color-royal-gold: #ffd700;
+  --color-royal-red: #c8102e;
+  --color-deep-black: #0a0a0a;
+  
+  --animate-glow: glow 2s ease-in-out infinite alternate;
+}
+
+@layer utilities {
+  .member-image-container {
+    background-color: #000;
+    overflow: hidden;
+    position: relative;
+    user-select: none;
+    -webkit-user-select: none;
+    touch-action: pan-y;
+    -webkit-mask-image: -webkit-radial-gradient(white, black); /* Fix for overflow:hidden with border-radius on iOS */
+  }
+
+  .member-photo {
+    transition: transform 0.8s cubic-bezier(0.4, 0, 0.2, 1), filter 0.8s ease, -webkit-filter 0.8s ease;
+    will-change: transform, filter;
+    filter: grayscale(100%) brightness(0.6) !important;
+    -webkit-filter: grayscale(100%) brightness(0.6) !important;
+    transform: scale(1);
+  }
+
+  /* De kaart-hover of de actieve status van de foto zorgt voor kleur */
+  .group-card-hover:hover .member-photo,
+  .member-photo.is-active {
+    filter: grayscale(0%) brightness(1.1) !important;
+    -webkit-filter: grayscale(0%) brightness(1.1) !important;
+    transform: scale(1.1) !important;
+  }
+}
+
+@keyframes glow {
+  from {
+    filter: drop-shadow(0 0 2px #ffd700);
+  }
+  to {
+    filter: drop-shadow(0 0 10px #ffd700);
+  }
+}
+
+body {
+  background-color: var(--color-deep-black);
+  color: white;
+  color-scheme: dark;
+  accent-color: #ffd700;
+  @apply overflow-x-hidden;
+}
+
+/* Style the native calendar picker icon to match our theme */
+input[type="datetime-local"]::-webkit-calendar-picker-indicator {
+  cursor: pointer;
+  padding: 8px;
+  background-size: contain;
+  /* Ultimate Royal Gold filter for #ffd700 starting from default icon */
+  filter: brightness(0) saturate(100%) invert(85%) sepia(87%) saturate(1543%) hue-rotate(354deg) brightness(103%) contrast(104%) !important;
+  transition: transform 0.2s ease, filter 0.2s ease;
+}
+
+input[type="datetime-local"] {
+  accent-color: #ffd700 !important;
+  color-scheme: dark !important;
+  min-height: 48px;
+  font-family: inherit;
+}
+
+input[type="datetime-local"]::-webkit-calendar-picker-indicator:hover {
+  transform: scale(1.1);
+  filter: brightness(0) saturate(100%) invert(100%) sepia(0%) saturate(0%) hue-rotate(93deg) brightness(103%) contrast(103%) !important;
+}
+
+/* Style the text parts of the input to be cleaner */
+input[type="datetime-local"]::-webkit-datetime-edit-fields-wrapper {
+  padding: 2px;
+}
+
+input[type="datetime-local"]::-webkit-datetime-edit-text {
+  color: #666;
+  padding: 0 4px;
+}
+
+input[type="datetime-local"]::-webkit-datetime-edit-month-field,
+input[type="datetime-local"]::-webkit-datetime-edit-day-field,
+input[type="datetime-local"]::-webkit-datetime-edit-year-field,
+input[type="datetime-local"]::-webkit-datetime-edit-hour-field,
+input[type="datetime-local"]::-webkit-datetime-edit-minute-field {
+  color: #fff;
+  border-radius: 4px;
+  padding: 0 2px;
+}
+
+input[type="datetime-local"]::-webkit-datetime-edit-month-field:focus,
+input[type="datetime-local"]::-webkit-datetime-edit-day-field:focus,
+input[type="datetime-local"]::-webkit-datetime-edit-year-field:focus,
+input[type="datetime-local"]::-webkit-datetime-edit-hour-field:focus,
+input[type="datetime-local"]::-webkit-datetime-edit-minute-field:focus {
+  background-color: #ffd700 !important;
+  color: #000 !important;
+  outline: none;
+}
+
+.atmospheric-bg {
+  position: fixed;
+  inset: 0;
+  pointer-events: none;
+  z-index: -1;
+  opacity: 0.4;
+  background: 
+    radial-gradient(circle at 20% 30%, #4b0082 0%, transparent 50%),
+    radial-gradient(circle at 80% 70%, #c8102e 0%, transparent 50%),
+    radial-gradient(circle at 50% 50%, #ffd70011 0%, transparent 70%);
+}
+
+.glass-pill {
+  @apply backdrop-blur-2xl bg-white/5 border border-white/10 shadow-[0_8px_32px_0_rgba(0,0,0,0.37)];
+}
+
+.frosted-glass {
+  @apply backdrop-blur-md bg-white/10 border border-white/20 shadow-xl;
+}
+
+.glass-card {
+  @apply backdrop-blur-xl bg-white/[0.03] border border-white/10 shadow-2xl hover:bg-white/[0.06] transition-all duration-300;
+}
+
+.metallic-gold {
+  background: linear-gradient(
+    to bottom,
+    #ffd700 0%,
+    #fff5cc 50%,
+    #b8860b 100%
+  );
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+  filter: drop-shadow(0 5px 15px rgba(0,0,0,0.5));
+}

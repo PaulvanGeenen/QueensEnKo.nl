@@ -1,0 +1,93 @@
+{
+  "entities": {
+    "AgendaItem": {
+      "title": "Agenda Item",
+      "description": "An event on the agenda",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "date": { "type": "string", "format": "date-time" },
+        "locationName": { "type": "string" },
+        "locationCity": { "type": "string" },
+        "infoLink": { "type": "string" },
+        "ticketPrice": { "type": "string" },
+        "displayFrom": { "type": "string", "format": "date-time" },
+        "displayUntil": { "type": "string", "format": "date-time" },
+        "isVisible": { "type": "boolean" },
+        "ticketLink": { "type": "string" },
+        "isSoldOut": { "type": "boolean" },
+        "comments": { "type": "string" },
+        "address": { "type": "string" }
+      },
+      "required": ["id", "date", "locationName", "locationCity", "isVisible"]
+    },
+    "Session": {
+      "title": "Visitor Session",
+      "description": "Tracking detail for a single browsing session",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "startedAt": { "type": "string", "format": "date-time" },
+        "lastActiveAt": { "type": "string", "format": "date-time" },
+        "duration": { "type": "number" },
+        "referrer": { "type": "string" },
+        "city": { "type": "string" },
+        "country": { "type": "string" },
+        "latitude": { "type": "number" },
+        "longitude": { "type": "number" },
+        "device": { "type": "string" },
+        "os": { "type": "string" },
+        "userAgent": { "type": "string" },
+        "views": { "type": "object" },
+        "clicks": { "type": "array" }
+      },
+      "required": ["id", "startedAt", "duration"]
+    },
+    "DailySummary": {
+      "title": "Daily Visitor Summary",
+      "description": "Consolidated statistics for analytics aggregation",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "date": { "type": "string" },
+        "totalVisitors": { "type": "number" },
+        "avgDuration": { "type": "number" },
+        "cities": { "type": "object" },
+        "devices": { "type": "object" },
+        "os": { "type": "object" },
+        "referrers": { "type": "object" },
+        "clicks": { "type": "object" }
+      },
+      "required": ["id", "date", "totalVisitors"]
+    },
+    "NewsletterSubscriber": {
+      "title": "Newsletter Subscriber",
+      "description": "Email newsletter subscriptions details",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "email": { "type": "string" },
+        "subscribedAt": { "type": "string", "format": "date-time" }
+      },
+      "required": ["id", "email", "subscribedAt"]
+    }
+  },
+  "firestore": {
+    "agenda": {
+      "schema": "AgendaItem",
+      "description": "Collection of agenda items"
+    },
+    "sessions": {
+      "schema": "Session",
+      "description": "Individual visitor session logs"
+    },
+    "daily_summaries": {
+      "schema": "DailySummary",
+      "description": "Consolidated daily visitor stats"
+    },
+    "newsletter": {
+      "schema": "NewsletterSubscriber",
+      "description": "List of emails subscribed to the band newsletter"
+    }
+  }
+}
