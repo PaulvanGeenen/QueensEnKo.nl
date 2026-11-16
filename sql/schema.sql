@@ -69,3 +69,15 @@ CREATE TABLE IF NOT EXISTS `newsletter` (
   PRIMARY KEY (`id`),
   UNIQUE KEY `uniq_newsletter_email` (`email`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+CREATE TABLE IF NOT EXISTS `social_posts` (
+  `id` VARCHAR(128) NOT NULL,
+  `message` TEXT NOT NULL,
+  `imageUrl` TEXT NULL,
+  `platforms` VARCHAR(255) NOT NULL DEFAULT '[]',
+  `status` VARCHAR(32) NOT NULL DEFAULT 'queued',
+  `results` LONGTEXT NULL,
+  `createdAt` VARCHAR(64) NOT NULL,
+  PRIMARY KEY (`id`),
+  INDEX `idx_social_created` (`createdAt`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;

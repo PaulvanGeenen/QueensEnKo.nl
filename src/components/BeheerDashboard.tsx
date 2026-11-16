@@ -27,6 +27,7 @@ import {
   onSnapshot
 } from '../lib/firebase';
 import BeheerMap from './BeheerMap';
+import SocialComposer from './SocialComposer';
 
 interface DailySummaryData {
   id: string; // YYYY-MM-DD
@@ -1976,9 +1977,11 @@ export default function BeheerDashboard() {
                 <div>
                   <h3 className="text-zinc-500 text-xs uppercase tracking-widest font-mono">Sociale Kanalen</h3>
                   <h4 className="text-royal-gold text-lg font-bold italic">Social Media Beheer</h4>
-                  <p className="text-[10px] text-zinc-500 font-mono mt-1">Directe snelkoppelingen naar de officiële kanalen van Queens & Ko.</p>
+                  <p className="text-[10px] text-zinc-500 font-mono mt-1">Plaats direct berichten met foto op Facebook en Instagram, of open de officiële kanalen.</p>
                 </div>
               </div>
+
+              <SocialComposer />
 
               {/* Informative Explanation Panel for Dummy Users */}
               <div className="p-6 bg-zinc-950 border border-zinc-900 rounded-3xl relative overflow-hidden space-y-4">
