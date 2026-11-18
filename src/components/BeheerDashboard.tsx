@@ -1987,67 +1987,38 @@ export default function BeheerDashboard() {
 
               <SocialComposer />
 
-              {/* Grid of Social Channels */}
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                
-                {/* Facebook Card */}
-                <div className="bg-zinc-950 border border-zinc-900 p-6 md:p-8 rounded-3xl flex flex-col justify-between h-72 relative overflow-hidden group">
-                  <div className="absolute top-0 right-0 w-32 h-32 bg-blue-600/5 blur-[60px] rounded-full pointer-events-none" />
-                  <div className="space-y-4">
-                    <div className="flex justify-between items-start">
-                      <div className="p-4 bg-blue-600/10 text-blue-500 rounded-2xl border border-blue-600/15">
-                        <Facebook size={32} />
-                      </div>
-                      <span className="text-[10px] font-mono bg-blue-500/10 text-blue-400 px-2.5 py-1 rounded-full font-bold uppercase tracking-widest border border-blue-500/10">
-                        Facebook Pagina
-                      </span>
-                    </div>
-                    <div>
-                      <h4 className="text-lg font-bold text-white group-hover:text-blue-400 transition-colors">Queens & Ko on Facebook</h4>
-                      <p className="text-xs text-zinc-400 mt-1 leading-relaxed">
-                        Beheer berichten, reageer op fans, bekijk paginastatistieken en plan evenementen direct op de officiële Facebook-tijdlijn.
-                      </p>
-                    </div>
+              {/* Bekijk live kanalen (als bezoeker) */}
+              <div className="p-6 bg-zinc-950 border border-zinc-900 rounded-3xl flex flex-col sm:flex-row items-center justify-between gap-4 shadow-xl">
+                <div className="flex items-center gap-3.5">
+                  <div className="p-3 bg-zinc-900 text-royal-gold rounded-2xl border border-zinc-800">
+                    <Eye size={20} />
                   </div>
-                  <a 
-                    href="https://www.facebook.com/profile.php?id=100007789546947&fref=ts"
-                    target="_blank"
-                    rel="noopener noreferrer"
-                    className="w-full mt-4 px-5 py-3 bg-zinc-900 hover:bg-blue-600 text-zinc-300 hover:text-white font-bold text-xs rounded-xl transition-all duration-300 flex items-center justify-center gap-2 border border-zinc-800 hover:border-blue-500 transform active:scale-98"
-                  >
-                    Open Pagina <ExternalLink size={14} />
-                  </a>
+                  <div>
+                    <h5 className="text-sm font-bold text-white font-mono">Bekijken hoe het er online uitziet?</h5>
+                    <p className="text-xs text-zinc-400 font-sans mt-0.5">
+                      Berichten plaatsen doe je in het venster hierboven. Wil je als fan het resultaat bekijken op de live kanalen?
+                    </p>
+                  </div>
                 </div>
 
-                {/* Instagram Card */}
-                <div className="bg-zinc-950 border border-zinc-900 p-6 md:p-8 rounded-3xl flex flex-col justify-between h-72 relative overflow-hidden group">
-                  <div className="absolute top-0 right-0 w-32 h-32 bg-pink-600/5 blur-[60px] rounded-full pointer-events-none" />
-                  <div className="space-y-4">
-                    <div className="flex justify-between items-start">
-                      <div className="p-4 bg-pink-600/10 text-pink-500 rounded-2xl border border-pink-600/15">
-                        <Instagram size={32} />
-                      </div>
-                      <span className="text-[10px] font-mono bg-pink-500/10 text-pink-400 px-2.5 py-1 rounded-full font-bold uppercase tracking-widest border border-pink-500/10">
-                        Instagram Account
-                      </span>
-                    </div>
-                    <div>
-                      <h4 className="text-lg font-bold text-white group-hover:text-pink-400 transition-colors">Queens & Ko on Instagram</h4>
-                      <p className="text-xs text-zinc-400 mt-1 leading-relaxed">
-                        Deel sfeerfoto's van optredens, plaats stories van de show, bekijk bereikstatistieken en verbind met de volgers van Queens & Ko.
-                      </p>
-                    </div>
-                  </div>
-                  <a 
+                <div className="flex items-center gap-2.5 w-full sm:w-auto shrink-0">
+                  <a
+                    href="https://www.facebook.com/1543311408856205"
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="flex-1 sm:flex-none px-4 py-2.5 bg-blue-600/10 hover:bg-blue-600 border border-blue-500/25 text-blue-400 hover:text-white rounded-xl text-xs font-mono font-bold transition-all flex items-center justify-center gap-2"
+                  >
+                    <Facebook size={14} /> Bekijk Facebook <ExternalLink size={12} />
+                  </a>
+                  <a
                     href="https://www.instagram.com/queensenko/"
                     target="_blank"
                     rel="noopener noreferrer"
-                    className="w-full mt-4 px-5 py-3 bg-zinc-900 hover:bg-pink-600 text-zinc-300 hover:text-white font-bold text-xs rounded-xl transition-all duration-300 flex items-center justify-center gap-2 border border-zinc-800 hover:border-pink-500 transform active:scale-98"
+                    className="flex-1 sm:flex-none px-4 py-2.5 bg-pink-600/10 hover:bg-pink-600 border border-pink-500/25 text-pink-400 hover:text-white rounded-xl text-xs font-mono font-bold transition-all flex items-center justify-center gap-2"
                   >
-                    Open Pagina <ExternalLink size={14} />
+                    <Instagram size={14} /> Bekijk Instagram <ExternalLink size={12} />
                   </a>
                 </div>
-
               </div>
             </motion.div>
           )}

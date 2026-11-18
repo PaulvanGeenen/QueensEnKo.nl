@@ -291,6 +291,22 @@ export default function SocialComposer() {
           </div>
         </div>
 
+        {/* Duidelijke instructie voor bandleden */}
+        <div className="p-4 bg-royal-gold/10 border border-royal-gold/30 rounded-2xl flex items-start gap-3.5 relative z-10">
+          <div className="p-2 bg-royal-gold/20 text-royal-gold rounded-xl shrink-0 mt-0.5">
+            <Sparkles size={18} />
+          </div>
+          <div className="space-y-1">
+            <h4 className="text-xs font-bold text-royal-gold uppercase tracking-wider font-mono">
+              Hoe werkt dit voor de band?
+            </h4>
+            <p className="text-xs text-zinc-200 leading-relaxed font-sans">
+              Typ hieronder je bericht, voeg eventueel foto's toe en klik onderaan op de gouden knop. 
+              Je hoeft <strong>niet in te loggen op Facebook of Instagram</strong>; onze website publiceert het bericht direct automatisch namens Queens & Ko!
+            </p>
+          </div>
+        </div>
+
         {/* Stap 1: Berichttekst */}
         <div className="space-y-2 relative z-10">
           <div className="flex items-center justify-between">
