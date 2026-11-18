@@ -296,22 +296,8 @@ if ($method === 'POST') {
         if ($platform === 'facebook') {
             if (empty($fbPageId) || empty($metaToken)) {
                 $results['facebook'] = ['status' => 'queued', 'message' => 'Meta Page Token nog niet ingesteld in api/social_config.php'];
-            } elseif (count($mediaItems) === 1) {
-                // 1 foto direct publiceren op Page
-                $res = graphRequest("https://graph.facebook.com/v21.0/{$fbPageId}/photos", [
-                    'url' => $mediaItems[0]['url'],
-                    'caption' => $message,
-                    'access_token' => $metaToken,
-                ]);
-                if ($res['ok']) {
-                    $successCount++;
-                    $results['facebook'] = ['status' => 'published', 'postId' => $res['data']['post_id'] ?? ($res['data']['id'] ?? '')];
-                } else {
-                    $failCount++;
-                    $results['facebook'] = ['status' => 'error', 'message' => $res['error']];
-                }
-            } elseif (count($mediaItems) > 1) {
-                // Meerdere foto's: eerst elke foto ongepubliceerd uploaden, daarna koppelen aan feed post
+            } elseif (count($mediaItems) > 0) {
+                // Foto('s): eerst ongepubliceerd uploaden, daarna als prominent tijdlijnbericht plaatsen via /feed
                 $uploadedPhotoIds = [];
                 $uploadFailed = false;
                 $lastErr = '';
@@ -342,14 +328,18 @@ if ($method === 'POST') {
                     ]);
                     if ($feedRes['ok']) {
                         $successCount++;
-                        $results['facebook'] = ['status' => 'published', 'postId' => $feedRes['data']['id'] ?? '', 'photosCount' => count($uploadedPhotoIds)];
+                        $results['facebook'] = [
+                            'status' => 'published',
+                            'postId' => $feedRes['data']['id'] ?? '',
+                            'photosCount' => count($uploadedPhotoIds),
+                        ];
                     } else {
                         $failCount++;
                         $results['facebook'] = ['status' => 'error', 'message' => $feedRes['error']];
                     }
                 }
             } else {
-                // Tekstbericht zonder foto
+                // Tekstbericht zonder foto direct op tijdlijn
                 $res = graphRequest("https://graph.facebook.com/v21.0/{$fbPageId}/feed", [
                     'message' => $message,
                     'access_token' => $metaToken,
