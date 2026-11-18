@@ -594,6 +594,30 @@ export default function SocialComposer() {
                   </div>
 
                   <div className="flex sm:flex-col items-center justify-end gap-2 shrink-0 border-t sm:border-t-0 border-zinc-850 pt-2 sm:pt-0">
+                    {post.results?.facebook?.postId && (
+                      <a
+                        href={`https://www.facebook.com/${post.results.facebook.postId}`}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="px-3 py-1.5 bg-blue-600/15 hover:bg-blue-600 text-blue-400 hover:text-white border border-blue-500/25 text-[11px] font-mono rounded-xl transition-all flex items-center gap-1.5"
+                        title="Bekijk dit bericht direct op Facebook"
+                      >
+                        <ExternalLink size={12} />
+                        <span>Bekijk op Facebook</span>
+                      </a>
+                    )}
+                    {post.results?.instagram?.postId && (
+                      <a
+                        href="https://www.instagram.com/queensenko/"
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="px-3 py-1.5 bg-pink-600/15 hover:bg-pink-600 text-pink-400 hover:text-white border border-pink-500/25 text-[11px] font-mono rounded-xl transition-all flex items-center gap-1.5"
+                        title="Bekijk Instagram profiel"
+                      >
+                        <ExternalLink size={12} />
+                        <span>Bekijk op Instagram</span>
+                      </a>
+                    )}
                     <button
                       type="button"
                       onClick={() => handleCopyText(post.id, post.message)}
