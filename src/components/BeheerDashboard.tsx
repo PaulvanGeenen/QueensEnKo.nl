@@ -28,6 +28,7 @@ import {
 } from '../lib/firebase';
 import BeheerMap from './BeheerMap';
 import SocialComposer from './SocialComposer';
+import { FileManager } from './FileManager';
 
 interface DailySummaryData {
   id: string; // YYYY-MM-DD
@@ -1843,11 +1844,14 @@ export default function BeheerDashboard() {
               exit={{ opacity: 0, y: -15 }}
               className="space-y-6"
             >
+              {/* Interactief Bestandsbeheer & Mappenstructuur */}
+              <FileManager mode="manager" />
+
               <div className="flex flex-col md:flex-row justify-between md:items-center gap-4 bg-zinc-950 border border-zinc-900 p-6 rounded-2xl">
                 <div>
-                  <h3 className="text-zinc-500 text-xs uppercase tracking-widest font-mono">Media & Downloads</h3>
+                  <h3 className="text-zinc-500 text-xs uppercase tracking-widest font-mono">Downloads & Promotie</h3>
                   <h4 className="text-royal-gold text-lg font-bold italic">Pers- en Promotiemateriaal</h4>
-                  <p className="text-[10px] text-zinc-500 font-mono mt-1">Hier vind je de bestanden die worden gebruikt voor persberichten, promotie en websitebeheer.</p>
+                  <p className="text-[10px] text-zinc-500 font-mono mt-1">Hieronder vind je de directe links en instructies voor externe media en organisatoren.</p>
                 </div>
               </div>
 

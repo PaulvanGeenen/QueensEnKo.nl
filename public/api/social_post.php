@@ -3,6 +3,10 @@
  * ==============================================================================
  * Queens & Ko.nl - Social Media Post Bridge (Facebook & Instagram via Meta Graph API)
  * ==============================================================================
+ * Ondersteunt:
+ * - Enkele en meervoudige foto's (Facebook Multi-Photo Albums & Instagram Carousels)
+ * - Foto's rechtstreeks uploaden of kiezen uit de Mediabibliotheek (/storage/)
+ * - Automatische Instagram aspect ratio adapter (voorkomt weigering door Meta)
  */
 
 header("Access-Control-Allow-Origin: *");
@@ -49,6 +53,7 @@ if ($pdo) {
         `id` VARCHAR(128) NOT NULL,
         `message` TEXT NOT NULL,
         `imageUrl` TEXT NULL,
+        `imageUrls` LONGTEXT NULL,
         `platforms` VARCHAR(255) NOT NULL DEFAULT '[]',
         `status` VARCHAR(32) NOT NULL DEFAULT 'queued',
         `results` LONGTEXT NULL,
@@ -56,6 +61,10 @@ if ($pdo) {
         PRIMARY KEY (`id`),
         INDEX `idx_social_created` (`createdAt`)
     ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci");
+
+    try {
+        $pdo->exec("ALTER TABLE `social_posts` ADD COLUMN `imageUrls` LONGTEXT NULL AFTER `imageUrl`");
+    } catch (Exception $e) {}
 }
 
 function graphRequest(string $url, array $params): array {
@@ -63,7 +72,7 @@ function graphRequest(string $url, array $params): array {
     curl_setopt($ch, CURLOPT_POST, true);
     curl_setopt($ch, CURLOPT_POSTFIELDS, http_build_query($params));
     curl_setopt($ch, CURLOPT_RETURNTRANSFER, true);
-    curl_setopt($ch, CURLOPT_TIMEOUT, 20);
+    curl_setopt($ch, CURLOPT_TIMEOUT, 30);
     $raw = curl_exec($ch);
     $httpCode = curl_getinfo($ch, CURLINFO_HTTP_CODE);
     $curlErr = curl_error($ch);
@@ -84,7 +93,7 @@ function graphRequest(string $url, array $params): array {
  * Zorgt dat een afbeelding altijd voldoet aan de strenge Instagram feed eisen:
  * - Aspect ratio tussen 4:5 (0.80) en 1.91:1 (1.91)
  * - Minimale breedte 320px
- * Zo niet, wordt de foto automatisch op een strakke donkere canvas gecentreerd.
+ * Zo niet, wordt de foto automatisch op een donker canvas gecentreerd.
  */
 function prepareInstagramImage(string $filePath, string $siteUrl): string {
     if (!file_exists($filePath) || !function_exists('getimagesize') || !function_exists('imagecreatetruecolor')) {
@@ -103,6 +112,11 @@ function prepareInstagramImage(string $filePath, string $siteUrl): string {
 
     $ratio = $w / $h;
     if ($ratio >= 0.80 && $ratio <= 1.91 && $w >= 320) {
+        // Al reeds geldige verhouding
+        if (str_starts_with($filePath, realpath(__DIR__ . '/../storage'))) {
+            $rel = str_replace(realpath(__DIR__ . '/../storage'), '', $filePath);
+            return $siteUrl . '/storage' . str_replace('\\', '/', $rel);
+        }
         return $siteUrl . '/uploads/social/' . basename($filePath);
     }
 
@@ -128,8 +142,11 @@ function prepareInstagramImage(string $filePath, string $siteUrl): string {
     $dstY = (int)(($targetDim - $h) / 2);
     imagecopy($canvas, $src, $dstX, $dstY, 0, 0, $w, $h);
 
-    $igFilename = 'ig_' . basename($filePath, '.' . pathinfo($filePath, PATHINFO_EXTENSION)) . '.jpg';
-    $igPath = dirname($filePath) . '/' . $igFilename;
+    $uploadDir = __DIR__ . '/../uploads/social';
+    if (!is_dir($uploadDir)) mkdir($uploadDir, 0755, true);
+
+    $igFilename = 'ig_' . date('Ymd_His') . '_' . bin2hex(random_bytes(3)) . '.jpg';
+    $igPath = $uploadDir . '/' . $igFilename;
     imagejpeg($canvas, $igPath, 92);
 
     imagedestroy($canvas);
@@ -143,10 +160,11 @@ $method = $_SERVER['REQUEST_METHOD'];
 if ($method === 'GET') {
     $posts = [];
     if ($pdo) {
-        $rows = $pdo->query("SELECT * FROM `social_posts` ORDER BY `createdAt` DESC LIMIT 20")->fetchAll();
+        $rows = $pdo->query("SELECT * FROM `social_posts` ORDER BY `createdAt` DESC LIMIT 25")->fetchAll();
         foreach ($rows as $r) {
             $r['platforms'] = json_decode($r['platforms'] ?? '[]', true) ?: [];
             $r['results'] = json_decode($r['results'] ?? '{}', true) ?: [];
+            $r['imageUrls'] = json_decode($r['imageUrls'] ?? '[]', true) ?: (!empty($r['imageUrl']) ? [$r['imageUrl']] : []);
             $posts[] = $r;
         }
     }
@@ -178,9 +196,84 @@ if ($method === 'POST') {
     $platformsRaw = $_POST['platforms'] ?? '[]';
     $platforms = is_array($platformsRaw) ? $platformsRaw : (json_decode((string)$platformsRaw, true) ?: []);
 
-    if (empty($message) && empty($_FILES['image']['tmp_name'])) {
+    // Verzamelen van alle media items [{ url: string, localPath?: string }]
+    $mediaItems = [];
+
+    // 1. Nieuwe geüploade bestanden verwerken (enkel of meervoudig via images[] of image)
+    $uploadDir = __DIR__ . '/../uploads/social';
+    if (!is_dir($uploadDir)) mkdir($uploadDir, 0755, true);
+
+    $rawFiles = $_FILES['images'] ?? ($_FILES['image'] ?? null);
+    if ($rawFiles) {
+        $normalizedFiles = [];
+        if (is_array($rawFiles['name'])) {
+            $cnt = count($rawFiles['name']);
+            for ($i = 0; $i < $cnt; $i++) {
+                if ($rawFiles['error'][$i] === UPLOAD_ERR_OK && !empty($rawFiles['name'][$i])) {
+                    $normalizedFiles[] = [
+                        'name' => $rawFiles['name'][$i],
+                        'tmp_name' => $rawFiles['tmp_name'][$i],
+                        'size' => $rawFiles['size'][$i],
+                    ];
+                }
+            }
+        } else {
+            if ($rawFiles['error'] === UPLOAD_ERR_OK && !empty($rawFiles['name'])) {
+                $normalizedFiles[] = [
+                    'name' => $rawFiles['name'],
+                    'tmp_name' => $rawFiles['tmp_name'],
+                    'size' => $rawFiles['size'],
+                ];
+            }
+        }
+
+        $allowedExt = ['jpg', 'jpeg', 'png', 'webp'];
+        foreach ($normalizedFiles as $f) {
+            $ext = strtolower(pathinfo($f['name'], PATHINFO_EXTENSION));
+            if (!in_array($ext, $allowedExt, true) || $f['size'] > 12 * 1024 * 1024) continue;
+
+            $filename = 'post_' . date('Ymd_His') . '_' . bin2hex(random_bytes(4)) . '.' . $ext;
+            $targetPath = $uploadDir . '/' . $filename;
+            if (move_uploaded_file($f['tmp_name'], $targetPath)) {
+                $mediaItems[] = [
+                    'url' => $siteUrl . '/uploads/social/' . $filename,
+                    'localPath' => $targetPath,
+                ];
+            }
+        }
+    }
+
+    // 2. Bestaande mediabibliotheek foto's (imageUrls[] of imageUrls als JSON)
+    $chosenUrlsRaw = $_POST['imageUrls'] ?? ($_POST['imageUrl'] ?? null);
+    if (!empty($chosenUrlsRaw)) {
+        $chosenUrls = is_array($chosenUrlsRaw) ? $chosenUrlsRaw : (json_decode((string)$chosenUrlsRaw, true) ?: [$chosenUrlsRaw]);
+        $storageRoot = realpath(__DIR__ . '/../storage');
+
+        foreach ($chosenUrls as $u) {
+            $u = trim((string)$u);
+            if (empty($u)) continue;
+
+            // Zoek evt. lokaal pad op als de URL verwijst naar ons eigen /storage/
+            $local = null;
+            if ($storageRoot && str_contains($u, '/storage/')) {
+                $sub = explode('/storage/', $u, 2)[1] ?? '';
+                $decodedSub = urldecode($sub);
+                $candidate = realpath($storageRoot . '/' . $decodedSub);
+                if ($candidate && file_exists($candidate) && str_starts_with($candidate, $storageRoot)) {
+                    $local = $candidate;
+                }
+            }
+
+            $mediaItems[] = [
+                'url' => $u,
+                'localPath' => $local,
+            ];
+        }
+    }
+
+    if (empty($message) && empty($mediaItems)) {
         http_response_code(400);
-        echo json_encode(['error' => 'Vul een bericht of kies een foto.']);
+        echo json_encode(['error' => 'Vul een bericht in of kies minimaal één foto.']);
         exit;
     }
     if (empty($platforms)) {
@@ -189,46 +282,24 @@ if ($method === 'POST') {
         exit;
     }
 
-    $imageUrl = '';
-    $targetPath = '';
-    if (!empty($_FILES['image']['tmp_name']) && $_FILES['image']['error'] === UPLOAD_ERR_OK) {
-        $allowedExt = ['jpg', 'jpeg', 'png', 'webp'];
-        $ext = strtolower(pathinfo($_FILES['image']['name'], PATHINFO_EXTENSION));
-        if (!in_array($ext, $allowedExt, true)) {
-            http_response_code(400);
-            echo json_encode(['error' => 'Alleen JPG, PNG of WebP afbeeldingen zijn toegestaan.']);
-            exit;
-        }
-        if ($_FILES['image']['size'] > 8 * 1024 * 1024) {
-            http_response_code(400);
-            echo json_encode(['error' => 'Foto mag maximaal 8 MB groot zijn.']);
-            exit;
-        }
-        $uploadDir = __DIR__ . '/../uploads/social';
-        if (!is_dir($uploadDir)) {
-            mkdir($uploadDir, 0755, true);
-        }
-        $filename = 'post_' . date('Ymd_His') . '_' . bin2hex(random_bytes(4)) . '.' . $ext;
-        $targetPath = $uploadDir . '/' . $filename;
-        if (!move_uploaded_file($_FILES['image']['tmp_name'], $targetPath)) {
-            http_response_code(500);
-            echo json_encode(['error' => 'Kon de foto niet opslaan op de server.']);
-            exit;
-        }
-        $imageUrl = $siteUrl . '/uploads/social/' . $filename;
-    }
+    $allUrls = array_map(fn($m) => $m['url'], $mediaItems);
+    $primaryImageUrl = $allUrls[0] ?? '';
 
     $results = [];
     $successCount = 0;
     $failCount = 0;
 
     foreach ($platforms as $platform) {
+        // =====================================================================
+        // FACEBOOK (Ondersteunt tekst, 1 foto, of Meerdere Foto's via Album Post)
+        // =====================================================================
         if ($platform === 'facebook') {
             if (empty($fbPageId) || empty($metaToken)) {
                 $results['facebook'] = ['status' => 'queued', 'message' => 'Meta Page Token nog niet ingesteld in api/social_config.php'];
-            } elseif (!empty($imageUrl)) {
+            } elseif (count($mediaItems) === 1) {
+                // 1 foto direct publiceren op Page
                 $res = graphRequest("https://graph.facebook.com/v21.0/{$fbPageId}/photos", [
-                    'url' => $imageUrl,
+                    'url' => $mediaItems[0]['url'],
                     'caption' => $message,
                     'access_token' => $metaToken,
                 ]);
@@ -239,7 +310,46 @@ if ($method === 'POST') {
                     $failCount++;
                     $results['facebook'] = ['status' => 'error', 'message' => $res['error']];
                 }
+            } elseif (count($mediaItems) > 1) {
+                // Meerdere foto's: eerst elke foto ongepubliceerd uploaden, daarna koppelen aan feed post
+                $uploadedPhotoIds = [];
+                $uploadFailed = false;
+                $lastErr = '';
+
+                foreach ($mediaItems as $item) {
+                    $up = graphRequest("https://graph.facebook.com/v21.0/{$fbPageId}/photos", [
+                        'url' => $item['url'],
+                        'published' => 'false',
+                        'access_token' => $metaToken,
+                    ]);
+                    if ($up['ok'] && !empty($up['data']['id'])) {
+                        $uploadedPhotoIds[] = ['media_fbid' => $up['data']['id']];
+                    } else {
+                        $uploadFailed = true;
+                        $lastErr = $up['error'] ?? 'Foto uploaden naar Facebook mislukt';
+                        break;
+                    }
+                }
+
+                if ($uploadFailed || empty($uploadedPhotoIds)) {
+                    $failCount++;
+                    $results['facebook'] = ['status' => 'error', 'message' => $lastErr];
+                } else {
+                    $feedRes = graphRequest("https://graph.facebook.com/v21.0/{$fbPageId}/feed", [
+                        'message' => $message,
+                        'attached_media' => json_encode($uploadedPhotoIds),
+                        'access_token' => $metaToken,
+                    ]);
+                    if ($feedRes['ok']) {
+                        $successCount++;
+                        $results['facebook'] = ['status' => 'published', 'postId' => $feedRes['data']['id'] ?? '', 'photosCount' => count($uploadedPhotoIds)];
+                    } else {
+                        $failCount++;
+                        $results['facebook'] = ['status' => 'error', 'message' => $feedRes['error']];
+                    }
+                }
             } else {
+                // Tekstbericht zonder foto
                 $res = graphRequest("https://graph.facebook.com/v21.0/{$fbPageId}/feed", [
                     'message' => $message,
                     'access_token' => $metaToken,
@@ -252,22 +362,30 @@ if ($method === 'POST') {
                     $results['facebook'] = ['status' => 'error', 'message' => $res['error']];
                 }
             }
-        } elseif ($platform === 'instagram') {
+        }
+
+        // =====================================================================
+        // INSTAGRAM (Ondersteunt 1 foto of Meerdere Foto's via CAROUSEL Album)
+        // =====================================================================
+        elseif ($platform === 'instagram') {
             if (empty($igUserId) || empty($metaToken)) {
                 $results['instagram'] = ['status' => 'queued', 'message' => 'Meta Instagram ID/Token nog niet ingesteld in api/social_config.php'];
-            } elseif (empty($imageUrl)) {
+            } elseif (empty($mediaItems)) {
                 $failCount++;
-                $results['instagram'] = ['status' => 'error', 'message' => 'Instagram vereist altijd een foto bij een bericht.'];
-            } else {
-                $igImageUrl = !empty($targetPath) ? prepareInstagramImage($targetPath, $siteUrl) : $imageUrl;
+                $results['instagram'] = ['status' => 'error', 'message' => 'Instagram vereist altijd minimaal één foto bij een bericht.'];
+            } elseif (count($mediaItems) === 1) {
+                // Enkele foto: aspect ratio waarborgen & publiceren
+                $item = $mediaItems[0];
+                $igUrl = !empty($item['localPath']) ? prepareInstagramImage($item['localPath'], $siteUrl) : $item['url'];
+
                 $container = graphRequest("https://graph.facebook.com/v21.0/{$igUserId}/media", [
-                    'image_url' => $igImageUrl,
+                    'image_url' => $igUrl,
                     'caption' => $message,
                     'access_token' => $metaToken,
                 ]);
                 if (!$container['ok'] || empty($container['data']['id'])) {
                     $failCount++;
-                    $results['instagram'] = ['status' => 'error', 'message' => $container['error'] ?? 'Media container mislukt'];
+                    $results['instagram'] = ['status' => 'error', 'message' => $container['error'] ?? 'Instagram media container mislukt'];
                 } else {
                     $publish = graphRequest("https://graph.facebook.com/v21.0/{$igUserId}/media_publish", [
                         'creation_id' => $container['data']['id'],
@@ -279,6 +397,61 @@ if ($method === 'POST') {
                     } else {
                         $failCount++;
                         $results['instagram'] = ['status' => 'error', 'message' => $publish['error']];
+                    }
+                }
+            } else {
+                // Meerdere foto's (Carousel): maximaal 10 items
+                $carouselItems = array_slice($mediaItems, 0, 10);
+                $childContainerIds = [];
+                $carouselErr = '';
+
+                foreach ($carouselItems as $cItem) {
+                    $cUrl = !empty($cItem['localPath']) ? prepareInstagramImage($cItem['localPath'], $siteUrl) : $cItem['url'];
+                    $cRes = graphRequest("https://graph.facebook.com/v21.0/{$igUserId}/media", [
+                        'image_url' => $cUrl,
+                        'is_carousel_item' => 'true',
+                        'access_token' => $metaToken,
+                    ]);
+                    if ($cRes['ok'] && !empty($cRes['data']['id'])) {
+                        $childContainerIds[] = $cRes['data']['id'];
+                    } else {
+                        $carouselErr = $cRes['error'] ?? 'Fout bij aanmaken Instagram carousel item';
+                        break;
+                    }
+                }
+
+                if (count($childContainerIds) < 2) {
+                    $failCount++;
+                    $results['instagram'] = ['status' => 'error', 'message' => $carouselErr ?: 'Kon carrousel niet samenstellen.'];
+                } else {
+                    // Parent container voor Carousel aanmaken
+                    $parent = graphRequest("https://graph.facebook.com/v21.0/{$igUserId}/media", [
+                        'media_type' => 'CAROUSEL',
+                        'children' => implode(',', $childContainerIds),
+                        'caption' => $message,
+                        'access_token' => $metaToken,
+                    ]);
+
+                    if (!$parent['ok'] || empty($parent['data']['id'])) {
+                        $failCount++;
+                        $results['instagram'] = ['status' => 'error', 'message' => $parent['error'] ?? 'Instagram carousel hoofdcontainer mislukt'];
+                    } else {
+                        // Carousel definitief publiceren
+                        $pub = graphRequest("https://graph.facebook.com/v21.0/{$igUserId}/media_publish", [
+                            'creation_id' => $parent['data']['id'],
+                            'access_token' => $metaToken,
+                        ]);
+                        if ($pub['ok']) {
+                            $successCount++;
+                            $results['instagram'] = [
+                                'status' => 'published',
+                                'postId' => $pub['data']['id'] ?? '',
+                                'carouselCount' => count($childContainerIds),
+                            ];
+                        } else {
+                            $failCount++;
+                            $results['instagram'] = ['status' => 'error', 'message' => $pub['error']];
+                        }
                     }
                 }
             }
@@ -297,7 +470,8 @@ if ($method === 'POST') {
     $postRecord = [
         'id' => 'soc_' . time() . '_' . mt_rand(100, 999),
         'message' => $message,
-        'imageUrl' => $imageUrl,
+        'imageUrl' => $primaryImageUrl,
+        'imageUrls' => $allUrls,
         'platforms' => $platforms,
         'status' => $overallStatus,
         'results' => $results,
@@ -305,11 +479,12 @@ if ($method === 'POST') {
     ];
 
     if ($pdo) {
-        $stmt = $pdo->prepare("INSERT INTO `social_posts` (`id`, `message`, `imageUrl`, `platforms`, `status`, `results`, `createdAt`) VALUES (?, ?, ?, ?, ?, ?, ?)");
+        $stmt = $pdo->prepare("INSERT INTO `social_posts` (`id`, `message`, `imageUrl`, `imageUrls`, `platforms`, `status`, `results`, `createdAt`) VALUES (?, ?, ?, ?, ?, ?, ?, ?)");
         $stmt->execute([
             $postRecord['id'],
             $postRecord['message'],
             $postRecord['imageUrl'],
+            json_encode($postRecord['imageUrls'], JSON_UNESCAPED_UNICODE),
             json_encode($postRecord['platforms'], JSON_UNESCAPED_UNICODE),
             $postRecord['status'],
             json_encode($postRecord['results'], JSON_UNESCAPED_UNICODE),

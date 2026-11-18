@@ -1,38 +1,51 @@
-import { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import {
-  Send,
-  Image as ImageIcon,
-  X,
   Facebook,
   Instagram,
-  CheckCircle2,
-  Clock,
-  AlertCircle,
-  Trash2,
-  Copy,
+  Send,
+  Image as ImageIcon,
   Check,
+  AlertCircle,
+  Clock,
+  CheckCircle2,
+  X,
   Sparkles,
+  Copy,
+  ExternalLink,
+  Trash2,
+  FolderOpen,
+  Plus,
+  Layers
 } from 'lucide-react';
-
-interface SocialPostRecord {
-  id: string;
-  message: string;
-  imageUrl: string;
-  platforms: string[];
-  status: 'published' | 'partial' | 'queued' | 'error';
-  results: Record<string, { status: string; message?: string; postId?: string }>;
-  createdAt: string;
-}
+import { FileManager, StorageItem } from './FileManager';
 
 interface SocialConfigStatus {
   facebook: boolean;
   instagram: boolean;
 }
 
+interface SocialPostRecord {
+  id: string;
+  message: string;
+  imageUrl?: string;
+  imageUrls?: string[];
+  platforms: ('facebook' | 'instagram')[];
+  status: 'published' | 'queued' | 'partial' | 'error';
+  results?: Record<string, any>;
+  createdAt: string;
+}
+
+interface SelectedMedia {
+  id: string;
+  file?: File;
+  url: string;
+  name: string;
+  source: 'upload' | 'storage';
+}
+
 export default function SocialComposer() {
   const [message, setMessage] = useState('');
-  const [imageFile, setImageFile] = useState<File | null>(null);
-  const [imagePreview, setImagePreview] = useState<string>('');
+  const [selectedMedia, setSelectedMedia] = useState<SelectedMedia[]>([]);
   const [selectedPlatforms, setSelectedPlatforms] = useState<{ facebook: boolean; instagram: boolean }>({
     facebook: true,
     instagram: true,
@@ -42,6 +55,7 @@ export default function SocialComposer() {
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [feedback, setFeedback] = useState<{ type: 'success' | 'warning' | 'error'; text: string } | null>(null);
   const [copiedId, setCopiedId] = useState<string | null>(null);
+  const [isLibraryOpen, setIsLibraryOpen] = useState(false);
   const fileInputRef = useRef<HTMLInputElement | null>(null);
 
   const loadPosts = async () => {
@@ -60,19 +74,61 @@ export default function SocialComposer() {
     loadPosts();
   }, []);
 
-  const handleImageChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const file = e.target.files?.[0];
-    if (!file) return;
-    if (imagePreview) URL.revokeObjectURL(imagePreview);
-    setImageFile(file);
-    setImagePreview(URL.createObjectURL(file));
+  const handleFilesUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const files = e.target.files;
+    if (!files || files.length === 0) return;
+
+    const newItems: SelectedMedia[] = [];
+    for (let i = 0; i < files.length; i++) {
+      const f = files[i];
+      newItems.push({
+        id: `upload_${Date.now()}_${i}_${Math.random().toString(36).substring(2, 6)}`,
+        file: f,
+        url: URL.createObjectURL(f),
+        name: f.name,
+        source: 'upload',
+      });
+    }
+
+    setSelectedMedia((prev) => [...prev, ...newItems]);
+    setFeedback(null);
+    if (fileInputRef.current) fileInputRef.current.value = '';
+  };
+
+  const handleLibrarySelect = (items: StorageItem[]) => {
+    const newItems: SelectedMedia[] = items.map((item, idx) => ({
+      id: `storage_${Date.now()}_${idx}_${Math.random().toString(36).substring(2, 6)}`,
+      url: item.url || '',
+      name: item.name,
+      source: 'storage',
+    }));
+
+    setSelectedMedia((prev) => {
+      // Voorkom duplicaten op basis van url
+      const existingUrls = new Set(prev.map((p) => p.url));
+      const filtered = newItems.filter((n) => !existingUrls.has(n.url));
+      return [...prev, ...filtered];
+    });
+
+    setIsLibraryOpen(false);
     setFeedback(null);
   };
 
-  const clearImage = () => {
-    if (imagePreview) URL.revokeObjectURL(imagePreview);
-    setImageFile(null);
-    setImagePreview('');
+  const removeMediaItem = (id: string) => {
+    setSelectedMedia((prev) => {
+      const item = prev.find((p) => p.id === id);
+      if (item?.file && item.url) {
+        URL.revokeObjectURL(item.url);
+      }
+      return prev.filter((p) => p.id !== id);
+    });
+  };
+
+  const clearAllMedia = () => {
+    selectedMedia.forEach((m) => {
+      if (m.file && m.url) URL.revokeObjectURL(m.url);
+    });
+    setSelectedMedia([]);
     if (fileInputRef.current) fileInputRef.current.value = '';
   };
 
@@ -96,12 +152,16 @@ export default function SocialComposer() {
       setFeedback({ type: 'error', text: 'Vink eerst minimaal één kanaal aan (Facebook of Instagram).' });
       return;
     }
-    if (!message.trim() && !imageFile) {
-      setFeedback({ type: 'error', text: 'Typ eerst een bericht of kies een foto.' });
+    if (!message.trim() && selectedMedia.length === 0) {
+      setFeedback({ type: 'error', text: 'Typ eerst een bericht of kies minimaal één foto.' });
       return;
     }
-    if (selectedPlatforms.instagram && !imageFile) {
-      setFeedback({ type: 'error', text: 'Voor Instagram moet je altijd een foto kiezen.' });
+    if (selectedPlatforms.instagram && selectedMedia.length === 0) {
+      setFeedback({ type: 'error', text: 'Voor Instagram moet je altijd minimaal één foto kiezen.' });
+      return;
+    }
+    if (selectedPlatforms.instagram && selectedMedia.length > 10) {
+      setFeedback({ type: 'error', text: 'Instagram ondersteunt maximaal 10 foto\'s in één carrousel.' });
       return;
     }
 
@@ -110,8 +170,17 @@ export default function SocialComposer() {
       const formData = new FormData();
       formData.append('message', message.trim());
       formData.append('platforms', JSON.stringify(platforms));
-      if (imageFile) {
-        formData.append('image', imageFile);
+
+      // Lokale bestanden doorsturen
+      const uploadFiles = selectedMedia.filter((m) => m.file).map((m) => m.file as File);
+      uploadFiles.forEach((file) => {
+        formData.append('images[]', file);
+      });
+
+      // Bibliotheek URLs doorsturen
+      const libraryUrls = selectedMedia.filter((m) => !m.file && m.url).map((m) => m.url);
+      if (libraryUrls.length > 0) {
+        formData.append('imageUrls', JSON.stringify(libraryUrls));
       }
 
       const res = await fetch('/api/social_post.php', {
@@ -127,16 +196,20 @@ export default function SocialComposer() {
 
       const status = data.post?.status;
       if (status === 'published') {
-        setFeedback({ type: 'success', text: 'Gelukt! Je bericht is direct geplaatst op de gekozen socials.' });
+        const countText = selectedMedia.length > 1 ? `met ${selectedMedia.length} foto's (als album/carrousel)` : '';
+        setFeedback({
+          type: 'success',
+          text: `Gelukt! Je bericht ${countText} is direct geplaatst op de gekozen socials.`,
+        });
         setMessage('');
-        clearImage();
+        clearAllMedia();
       } else if (status === 'queued') {
         setFeedback({
           type: 'warning',
-          text: 'Bericht & foto zijn opgeslagen! De directe Meta-koppeling (api/social_config.php) staat nog niet ingesteld, dus hij staat nu klaar in de wachtrij.',
+          text: 'Bericht & foto(\'s) zijn opgeslagen in de wachtrij.',
         });
         setMessage('');
-        clearImage();
+        clearAllMedia();
       } else if (status === 'partial') {
         setFeedback({
           type: 'warning',
@@ -144,7 +217,7 @@ export default function SocialComposer() {
         });
       } else {
         const firstErr = Object.values(data.results || {})
-          .map((r: any) => r?.message)
+          .map((r: any) => (r as any)?.message)
           .filter(Boolean)
           .join(' | ');
         setFeedback({ type: 'error', text: firstErr || 'Er ging iets mis bij het doorzetten.' });
@@ -180,43 +253,45 @@ export default function SocialComposer() {
       {/* Main Composer Card */}
       <form
         onSubmit={handleSubmit}
-        className="p-6 md:p-8 bg-zinc-950 border border-royal-gold/25 rounded-3xl space-y-6 relative overflow-hidden"
+        className="p-6 md:p-8 bg-zinc-950 border border-zinc-900 rounded-3xl space-y-6 relative overflow-hidden shadow-2xl"
       >
-        <div className="absolute top-0 right-0 w-64 h-64 bg-royal-gold/5 blur-[100px] rounded-full pointer-events-none" />
+        <div className="absolute top-0 right-0 w-80 h-80 bg-[radial-gradient(circle_at_top_right,rgba(212,175,55,0.08)_0%,transparent_70%)] pointer-events-none" />
 
-        <div className="flex flex-col md:flex-row md:items-center justify-between gap-3 relative z-10">
+        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 border-b border-zinc-900 pb-5 relative z-10">
           <div>
-            <span className="text-[10px] text-royal-gold font-mono uppercase tracking-widest font-bold block">
-              Direct Plaatsen (Geen Social-login nodig)
-            </span>
-            <h3 className="text-xl font-bold text-white mt-0.5">Nieuw Social Media Bericht</h3>
-            <p className="text-xs text-zinc-400 mt-1">
-              Typ je tekst, kies een foto en vink aan waar het op moet. Klik op plaatsen en klaar!
+            <h3 className="text-royal-gold text-lg font-bold italic font-sans flex items-center gap-2">
+              Bericht & Foto's Publiceren
+            </h3>
+            <p className="text-xs text-zinc-400 font-mono mt-0.5">
+              Plaats in één keer op de officiële Facebookpagina en het Instagram-account van Queens & Ko.
             </p>
           </div>
-          <div className="flex flex-wrap gap-2">
+
+          <div className="flex items-center gap-2 font-mono text-[10px]">
             <span
-              className={`text-[10px] font-mono px-2.5 py-1 rounded-full border ${
+              className={`px-2.5 py-1 rounded-full border flex items-center gap-1.5 ${
                 configured.facebook
-                  ? 'bg-green-500/10 text-green-400 border-green-500/20'
-                  : 'bg-amber-500/10 text-amber-400 border-amber-500/20'
+                  ? 'bg-blue-500/10 border-blue-500/30 text-blue-400'
+                  : 'bg-zinc-900 border-zinc-800 text-zinc-500'
               }`}
             >
-              FB: {configured.facebook ? 'API Gekoppeld' : 'Wachtrij-modus'}
+              <Facebook size={12} />
+              {configured.facebook ? 'FB Actief' : 'FB Stand-by'}
             </span>
             <span
-              className={`text-[10px] font-mono px-2.5 py-1 rounded-full border ${
+              className={`px-2.5 py-1 rounded-full border flex items-center gap-1.5 ${
                 configured.instagram
-                  ? 'bg-green-500/10 text-green-400 border-green-500/20'
-                  : 'bg-amber-500/10 text-amber-400 border-amber-500/20'
+                  ? 'bg-pink-500/10 border-pink-500/30 text-pink-400'
+                  : 'bg-zinc-900 border-zinc-800 text-zinc-500'
               }`}
             >
-              IG: {configured.instagram ? 'API Gekoppeld' : 'Wachtrij-modus'}
+              <Instagram size={12} />
+              {configured.instagram ? 'IG Actief' : 'IG Stand-by'}
             </span>
           </div>
         </div>
 
-        {/* Stap 1: Tekst */}
+        {/* Stap 1: Berichttekst */}
         <div className="space-y-2 relative z-10">
           <div className="flex items-center justify-between">
             <label className="text-xs font-bold text-zinc-300 uppercase tracking-wider font-mono">
@@ -239,45 +314,112 @@ export default function SocialComposer() {
           />
         </div>
 
-        {/* Stap 2: Foto */}
-        <div className="space-y-2 relative z-10">
-          <label className="text-xs font-bold text-zinc-300 uppercase tracking-wider font-mono block">
-            2. Foto toevoegen {selectedPlatforms.instagram && <span className="text-pink-400">(verplicht voor Instagram)</span>}
-          </label>
-
-          {imagePreview ? (
-            <div className="relative inline-block">
-              <img
-                src={imagePreview}
-                alt="Voorbeeld"
-                className="max-h-64 rounded-2xl border border-zinc-800 object-cover"
-              />
+        {/* Stap 2: Foto's toevoegen (Enkel of Meerdere, Upload of Mediabibliotheek) */}
+        <div className="space-y-3 relative z-10">
+          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2">
+            <label className="text-xs font-bold text-zinc-300 uppercase tracking-wider font-mono block">
+              2. Foto('s) toevoegen {selectedPlatforms.instagram && <span className="text-pink-400">(verplicht voor Instagram)</span>}
+            </label>
+            {selectedMedia.length > 0 && (
               <button
                 type="button"
-                onClick={clearImage}
-                className="absolute top-2 right-2 p-1.5 bg-black/80 hover:bg-red-600 text-white rounded-full transition-colors"
-                title="Foto verwijderen"
+                onClick={clearAllMedia}
+                className="text-[10px] font-mono text-zinc-400 hover:text-red-400 flex items-center gap-1 self-start sm:self-auto"
               >
-                <X size={16} />
+                <X size={12} /> Alles wissen
               </button>
-            </div>
-          ) : (
+            )}
+          </div>
+
+          {/* Action buttons: Upload of Kies uit bibliotheek */}
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
             <button
               type="button"
               onClick={() => fileInputRef.current?.click()}
-              className="w-full p-6 border-2 border-dashed border-zinc-800 hover:border-royal-gold/50 rounded-2xl bg-zinc-900/40 hover:bg-zinc-900/70 transition-all flex flex-col items-center justify-center gap-2 text-zinc-400 hover:text-royal-gold"
+              className="p-4 border-2 border-dashed border-zinc-800 hover:border-royal-gold/60 rounded-2xl bg-zinc-900/40 hover:bg-zinc-900/80 transition-all flex items-center gap-3 text-zinc-300 hover:text-white group text-left"
             >
-              <ImageIcon size={28} />
-              <span className="text-xs font-bold">Klik hier om een foto te kiezen (JPG, PNG of WebP, max 8 MB)</span>
+              <div className="p-2.5 bg-zinc-800 group-hover:bg-royal-gold/20 text-zinc-400 group-hover:text-royal-gold rounded-xl transition-colors shrink-0">
+                <ImageIcon size={20} />
+              </div>
+              <div>
+                <p className="text-xs font-bold font-mono">Upload foto('s)</p>
+                <p className="text-[10px] text-zinc-500 mt-0.5">Vanaf je computer of telefoon (meerdere mogelijk)</p>
+              </div>
             </button>
+
+            <button
+              type="button"
+              onClick={() => setIsLibraryOpen(true)}
+              className="p-4 border border-zinc-800 hover:border-royal-gold/60 rounded-2xl bg-zinc-900/60 hover:bg-zinc-900 transition-all flex items-center gap-3 text-zinc-300 hover:text-white group text-left"
+            >
+              <div className="p-2.5 bg-royal-gold/15 text-royal-gold rounded-xl transition-colors shrink-0">
+                <FolderOpen size={20} />
+              </div>
+              <div>
+                <p className="text-xs font-bold font-mono">Kies uit Bestandsbeheer</p>
+                <p className="text-[10px] text-zinc-500 mt-0.5">Kies uit bandfoto's & uploads op de server</p>
+              </div>
+            </button>
+
+            <input
+              ref={fileInputRef}
+              type="file"
+              multiple
+              accept="image/jpeg,image/png,image/webp"
+              onChange={handleFilesUpload}
+              className="hidden"
+            />
+          </div>
+
+          {/* Lijst / Grid met geselecteerde foto's */}
+          {selectedMedia.length > 0 && (
+            <div className="space-y-2 pt-2">
+              <div className="flex items-center gap-2 text-xs font-mono">
+                {selectedMedia.length > 1 ? (
+                  <span className="flex items-center gap-1.5 px-3 py-1 rounded-full bg-royal-gold/15 border border-royal-gold/30 text-royal-gold font-bold">
+                    <Layers size={13} /> {selectedMedia.length} foto's geselecteerd: Wordt als Album op FB en Carrousel op IG geplaatst!
+                  </span>
+                ) : (
+                  <span className="text-zinc-400">1 foto geselecteerd</span>
+                )}
+              </div>
+
+              <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-6 gap-3 pt-1">
+                {selectedMedia.map((media, index) => (
+                  <div
+                    key={media.id}
+                    className="relative group rounded-2xl overflow-hidden border border-zinc-800 bg-zinc-900 aspect-square shadow-lg"
+                  >
+                    <img
+                      src={media.url}
+                      alt={media.name}
+                      className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300"
+                    />
+
+                    {/* Volgordebadge */}
+                    <div className="absolute top-2 left-2 px-2 py-0.5 rounded-lg bg-black/80 backdrop-blur-sm text-[10px] font-mono font-bold text-royal-gold border border-royal-gold/30">
+                      #{index + 1}
+                    </div>
+
+                    {/* Verwijderknop */}
+                    <button
+                      type="button"
+                      onClick={() => removeMediaItem(media.id)}
+                      className="absolute top-2 right-2 p-1.5 bg-black/80 hover:bg-red-600 text-white rounded-xl transition-colors shadow-md"
+                      title="Verwijder foto"
+                    >
+                      <X size={13} />
+                    </button>
+
+                    {/* Bron label onderin */}
+                    <div className="absolute bottom-0 inset-x-0 bg-gradient-to-t from-black/90 to-transparent p-2 text-[10px] font-mono text-zinc-300 truncate">
+                      {media.name}
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </div>
           )}
-          <input
-            ref={fileInputRef}
-            type="file"
-            accept="image/jpeg,image/png,image/webp"
-            onChange={handleImageChange}
-            className="hidden"
-          />
         </div>
 
         {/* Stap 3: Kanalen kiezen */}
@@ -365,7 +507,9 @@ export default function SocialComposer() {
           className="w-full py-4 bg-royal-gold hover:bg-white disabled:opacity-50 text-black font-extrabold text-sm uppercase tracking-wider rounded-2xl transition-all flex items-center justify-center gap-2 shadow-lg shadow-royal-gold/10 relative z-10"
         >
           <Send size={16} />
-          {isSubmitting ? 'Bezig met plaatsen...' : 'Plaats op aangevinkte socials'}
+          {isSubmitting
+            ? 'Bezig met plaatsen op socials...'
+            : `Plaats op aangevinkte socials ${selectedMedia.length > 1 ? `(${selectedMedia.length} foto's)` : ''}`}
         </button>
       </form>
 
@@ -376,81 +520,99 @@ export default function SocialComposer() {
             Recente Social Berichten ({posts.length})
           </h4>
           <div className="space-y-3">
-            {posts.map((post) => (
-              <div
-                key={post.id}
-                className="p-4 bg-zinc-900/50 border border-zinc-850 rounded-2xl flex flex-col sm:flex-row gap-4 justify-between"
-              >
-                <div className="flex gap-4 min-w-0">
-                  {post.imageUrl && (
-                    <img
-                      src={post.imageUrl}
-                      alt=""
-                      className="w-20 h-20 rounded-xl object-cover shrink-0 border border-zinc-800"
-                    />
-                  )}
-                  <div className="space-y-1.5 min-w-0">
-                    <div className="flex flex-wrap items-center gap-2">
-                      <span
-                        className={`text-[10px] font-mono px-2 py-0.5 rounded-full font-bold uppercase ${
-                          post.status === 'published'
-                            ? 'bg-green-500/15 text-green-400'
-                            : post.status === 'queued'
-                            ? 'bg-amber-500/15 text-amber-400'
-                            : 'bg-red-500/15 text-red-400'
-                        }`}
-                      >
-                        {post.status === 'published'
-                          ? 'Geplaatst'
-                          : post.status === 'queued'
-                          ? 'Klaargezet'
-                          : post.status === 'partial'
-                          ? 'Gedeeltelijk'
-                          : 'Fout'}
-                      </span>
-                      {post.platforms.map((pl) => (
-                        <span key={pl} className="text-[10px] font-mono text-zinc-400 uppercase">
-                          • {pl}
-                        </span>
-                      ))}
-                      <span className="text-[10px] font-mono text-zinc-600">
-                        {new Date(post.createdAt).toLocaleString('nl-NL')}
-                      </span>
-                    </div>
-                    <p className="text-xs text-zinc-200 whitespace-pre-line break-words">{post.message}</p>
-                    {post.results && Object.keys(post.results).length > 0 && (
-                      <div className="text-[10px] font-mono text-zinc-500 space-y-0.5">
-                        {Object.entries(post.results).map(([k, r]) => (
-                          <div key={k}>
-                            {k}: {r.status}
-                            {r.message ? ` — ${r.message}` : ''}
-                          </div>
+            {posts.map((post) => {
+              const displayImages = post.imageUrls && post.imageUrls.length > 0 ? post.imageUrls : (post.imageUrl ? [post.imageUrl] : []);
+              return (
+                <div
+                  key={post.id}
+                  className="p-4 bg-zinc-900/50 border border-zinc-850 rounded-2xl flex flex-col sm:flex-row gap-4 justify-between"
+                >
+                  <div className="flex gap-4 min-w-0">
+                    {displayImages.length > 0 && (
+                      <div className="flex gap-1.5 shrink-0">
+                        {displayImages.slice(0, 3).map((imgUrl, i) => (
+                          <img
+                            key={i}
+                            src={imgUrl}
+                            alt=""
+                            className="w-16 h-16 rounded-xl object-cover border border-zinc-800"
+                          />
                         ))}
+                        {displayImages.length > 3 && (
+                          <div className="w-16 h-16 rounded-xl bg-zinc-800 border border-zinc-700 flex items-center justify-center text-xs font-mono text-royal-gold font-bold">
+                            +{displayImages.length - 3}
+                          </div>
+                        )}
                       </div>
                     )}
+                    <div className="space-y-1.5 min-w-0">
+                      <div className="flex flex-wrap items-center gap-2">
+                        <span
+                          className={`text-[10px] font-mono px-2 py-0.5 rounded-full font-bold uppercase ${
+                            post.status === 'published'
+                              ? 'bg-green-500/15 text-green-400'
+                              : post.status === 'queued'
+                              ? 'bg-amber-500/15 text-amber-400'
+                              : 'bg-red-500/15 text-red-400'
+                          }`}
+                        >
+                          {post.status === 'published'
+                            ? 'Geplaatst'
+                            : post.status === 'queued'
+                            ? 'Klaargezet'
+                            : post.status === 'partial'
+                            ? 'Gedeeltelijk'
+                            : 'Fout'}
+                        </span>
+                        {post.platforms.map((pl) => (
+                          <span key={pl} className="text-[10px] font-mono text-zinc-400 uppercase">
+                            • {pl}
+                          </span>
+                        ))}
+                        <span className="text-[10px] font-mono text-zinc-600">
+                          {new Date(post.createdAt).toLocaleString('nl-NL')}
+                        </span>
+                      </div>
+                      <p className="text-xs text-zinc-200 whitespace-pre-line break-words">{post.message}</p>
+                    </div>
+                  </div>
+
+                  <div className="flex sm:flex-col items-center justify-end gap-2 shrink-0 border-t sm:border-t-0 border-zinc-850 pt-2 sm:pt-0">
+                    <button
+                      type="button"
+                      onClick={() => handleCopyText(post.id, post.message)}
+                      className="px-3 py-1.5 bg-zinc-800 hover:bg-zinc-700 text-zinc-300 text-[11px] font-mono rounded-xl transition-colors flex items-center gap-1.5"
+                      title="Kopieer tekst"
+                    >
+                      <Copy size={12} />
+                      <span>{copiedId === post.id ? 'Gekopieerd!' : 'Kopieer'}</span>
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => handleDeletePost(post.id)}
+                      className="p-1.5 text-zinc-500 hover:text-red-400 hover:bg-red-500/10 rounded-xl transition-colors"
+                      title="Verwijder uit overzicht"
+                    >
+                      <Trash2 size={14} />
+                    </button>
                   </div>
                 </div>
+              );
+            })}
+          </div>
+        </div>
+      )}
 
-                <div className="flex sm:flex-col items-end justify-end gap-2 shrink-0">
-                  <button
-                    type="button"
-                    onClick={() => handleCopyText(post.id, post.message)}
-                    className="px-2.5 py-1.5 bg-zinc-900 hover:bg-royal-gold text-zinc-400 hover:text-black rounded-lg text-[10px] font-mono uppercase flex items-center gap-1 transition-colors"
-                  >
-                    {copiedId === post.id ? <Check size={11} /> : <Copy size={11} />}
-                    {copiedId === post.id ? 'Gekopieerd' : 'Kopieer'}
-                  </button>
-                  <button
-                    type="button"
-                    onClick={() => handleDeletePost(post.id)}
-                    className="p-1.5 text-zinc-600 hover:text-red-400 transition-colors"
-                    title="Verwijder uit overzicht"
-                  >
-                    <Trash2 size={14} />
-                  </button>
-                </div>
-              </div>
-            ))}
+      {/* MODAL: Mediabibliotheek Picker */}
+      {isLibraryOpen && (
+        <div className="fixed inset-0 z-50 bg-black/85 backdrop-blur-md flex items-center justify-center p-3 sm:p-6">
+          <div className="w-full max-w-4xl max-h-[90vh] flex flex-col">
+            <FileManager
+              mode="picker"
+              multiSelect={true}
+              onSelect={handleLibrarySelect}
+              onClose={() => setIsLibraryOpen(false)}
+            />
           </div>
         </div>
       )}
