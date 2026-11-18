@@ -24,13 +24,16 @@ import {
   Eye,
   AlertCircle,
   CheckCircle2,
-  HardDrive
+  HardDrive,
+  Lock,
+  Shield
 } from 'lucide-react';
 
 export interface StorageItem {
   name: string;
   path: string;
   isDir: boolean;
+  isProtected?: boolean;
   type: 'folder' | 'image' | 'document' | 'audio' | 'video' | 'archive' | 'other';
   extension: string;
   size: number;
@@ -387,6 +390,14 @@ export const FileManager: React.FC<FileManagerProps> = ({
         </div>
       </div>
 
+      {/* Systeembescherming Alert */}
+      <div className="px-5 py-3 bg-zinc-900/40 border-b border-zinc-900 flex items-center gap-3 text-xs">
+        <Shield size={16} className="text-royal-gold shrink-0" />
+        <span className="text-zinc-400 font-sans text-[11px] leading-relaxed">
+          <strong className="text-zinc-200">Afgeschermde bandopslag:</strong> De officiële websitebestanden (zoals pagina's, code en vaste bandfoto's) staan in een beveiligde systeemmap en kunnen hier <strong className="text-royal-gold">nooit</strong> worden aangetast of verwijderd.
+        </span>
+      </div>
+
       {/* Upload & Info Banners */}
       {uploadFeedback && (
         <div
@@ -464,16 +475,22 @@ export const FileManager: React.FC<FileManagerProps> = ({
                       </div>
 
                       {mode === 'manager' && (
-                        <button
-                          onClick={(e) => {
-                            e.stopPropagation();
-                            setIsDeletingItem(folder);
-                          }}
-                          className="opacity-0 group-hover:opacity-100 p-1.5 text-zinc-500 hover:text-red-400 hover:bg-red-500/10 rounded-lg transition-all"
-                          title="Map verwijderen"
-                        >
-                          <Trash2 size={13} />
-                        </button>
+                        folder.isProtected ? (
+                          <div className="p-1.5 text-zinc-600" title="Beveiligde hoofdmap (kan niet worden verwijderd)">
+                            <Lock size={13} />
+                          </div>
+                        ) : (
+                          <button
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              setIsDeletingItem(folder);
+                            }}
+                            className="opacity-0 group-hover:opacity-100 p-1.5 text-zinc-500 hover:text-red-400 hover:bg-red-500/10 rounded-lg transition-all"
+                            title="Map verwijderen"
+                          >
+                            <Trash2 size={13} />
+                          </button>
+                        )
                       )}
                     </div>
                   ))}

@@ -12,6 +12,8 @@
 header("Access-Control-Allow-Origin: *");
 header("Access-Control-Allow-Methods: GET, POST, OPTIONS");
 header("Access-Control-Allow-Headers: Content-Type, Authorization");
+header("Cache-Control: no-store, no-cache, must-revalidate, max-age=0");
+header("Pragma: no-cache");
 
 if ($_SERVER['REQUEST_METHOD'] === 'OPTIONS') {
     http_response_code(200);
@@ -139,6 +141,9 @@ if ($action === 'list') {
             $modified = @filemtime($itemFullPath) ?: time();
             $ext = strtolower(pathinfo($item, PATHINFO_EXTENSION));
 
+            $protectedRoots = ['Social Media Fotos', 'Gedeelde Documenten'];
+            $isProtected = in_array($itemRelPath, $protectedRoots, true);
+
             $type = 'other';
             if ($isDir) {
                 $type = 'folder';
@@ -158,6 +163,7 @@ if ($action === 'list') {
                 'name' => $item,
                 'path' => $itemRelPath,
                 'isDir' => $isDir,
+                'isProtected' => $isProtected,
                 'type' => $type,
                 'extension' => $ext,
                 'size' => $size,
@@ -366,6 +372,13 @@ if ($action === 'delete') {
     if ($targetRelPath === '') {
         http_response_code(400);
         echo json_encode(['error' => 'Hoofdmap kan niet worden verwijderd.']);
+        exit;
+    }
+
+    $protectedRoots = ['Social Media Fotos', 'Gedeelde Documenten'];
+    if (in_array(trim($targetRelPath, '/\\'), $protectedRoots, true)) {
+        http_response_code(403);
+        echo json_encode(['error' => 'Deze hoofdmap is beveiligd tegen verwijdering.']);
         exit;
     }
 
