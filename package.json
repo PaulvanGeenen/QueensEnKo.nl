@@ -8,6 +8,7 @@
     "build": "node ./node_modules/vite/bin/vite.js build",
     "start": "node ./node_modules/tsx/dist/cli.mjs server.ts",
     "lint": "node ./node_modules/typescript/bin/tsc --noEmit",
+    "sync:media": "node scripts/sync-media.js",
     "deploy": "node scripts/deploy.js"
   },
   "dependencies": {

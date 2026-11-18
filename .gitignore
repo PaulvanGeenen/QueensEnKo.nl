@@ -12,9 +12,6 @@ Thumbs.db
 # TransIP database & SFTP geheimen (NOOIT committen)
 public/api/config.php
 public/api/social_config.php
-public/uploads/
-public/storage/*
-!public/storage/**/.gitkeep
 firebase-applet-config.json
 *_import.sql
 *_backup.json
