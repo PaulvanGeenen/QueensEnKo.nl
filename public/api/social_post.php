@@ -80,6 +80,64 @@ function graphRequest(string $url, array $params): array {
     return ['ok' => false, 'error' => $errMsg];
 }
 
+/**
+ * Zorgt dat een afbeelding altijd voldoet aan de strenge Instagram feed eisen:
+ * - Aspect ratio tussen 4:5 (0.80) en 1.91:1 (1.91)
+ * - Minimale breedte 320px
+ * Zo niet, wordt de foto automatisch op een strakke donkere canvas gecentreerd.
+ */
+function prepareInstagramImage(string $filePath, string $siteUrl): string {
+    if (!file_exists($filePath) || !function_exists('getimagesize') || !function_exists('imagecreatetruecolor')) {
+        return $siteUrl . '/uploads/social/' . basename($filePath);
+    }
+    $info = @getimagesize($filePath);
+    if (!$info) {
+        return $siteUrl . '/uploads/social/' . basename($filePath);
+    }
+    $w = (int)$info[0];
+    $h = (int)$info[1];
+    $mime = $info['mime'] ?? '';
+    if ($w <= 0 || $h <= 0) {
+        return $siteUrl . '/uploads/social/' . basename($filePath);
+    }
+
+    $ratio = $w / $h;
+    if ($ratio >= 0.80 && $ratio <= 1.91 && $w >= 320) {
+        return $siteUrl . '/uploads/social/' . basename($filePath);
+    }
+
+    $src = null;
+    if (($mime === 'image/jpeg' || $mime === 'image/jpg') && function_exists('imagecreatefromjpeg')) {
+        $src = @imagecreatefromjpeg($filePath);
+    } elseif ($mime === 'image/png' && function_exists('imagecreatefrompng')) {
+        $src = @imagecreatefrompng($filePath);
+    } elseif ($mime === 'image/webp' && function_exists('imagecreatefromwebp')) {
+        $src = @imagecreatefromwebp($filePath);
+    }
+
+    if (!$src) {
+        return $siteUrl . '/uploads/social/' . basename($filePath);
+    }
+
+    $targetDim = max($w, $h, 1080);
+    $canvas = imagecreatetruecolor($targetDim, $targetDim);
+    $bg = imagecolorallocate($canvas, 18, 18, 20);
+    imagefill($canvas, 0, 0, $bg);
+
+    $dstX = (int)(($targetDim - $w) / 2);
+    $dstY = (int)(($targetDim - $h) / 2);
+    imagecopy($canvas, $src, $dstX, $dstY, 0, 0, $w, $h);
+
+    $igFilename = 'ig_' . basename($filePath, '.' . pathinfo($filePath, PATHINFO_EXTENSION)) . '.jpg';
+    $igPath = dirname($filePath) . '/' . $igFilename;
+    imagejpeg($canvas, $igPath, 92);
+
+    imagedestroy($canvas);
+    imagedestroy($src);
+
+    return $siteUrl . '/uploads/social/' . $igFilename;
+}
+
 $method = $_SERVER['REQUEST_METHOD'];
 
 if ($method === 'GET') {
@@ -132,6 +190,7 @@ if ($method === 'POST') {
     }
 
     $imageUrl = '';
+    $targetPath = '';
     if (!empty($_FILES['image']['tmp_name']) && $_FILES['image']['error'] === UPLOAD_ERR_OK) {
         $allowedExt = ['jpg', 'jpeg', 'png', 'webp'];
         $ext = strtolower(pathinfo($_FILES['image']['name'], PATHINFO_EXTENSION));
@@ -200,8 +259,9 @@ if ($method === 'POST') {
                 $failCount++;
                 $results['instagram'] = ['status' => 'error', 'message' => 'Instagram vereist altijd een foto bij een bericht.'];
             } else {
+                $igImageUrl = !empty($targetPath) ? prepareInstagramImage($targetPath, $siteUrl) : $imageUrl;
                 $container = graphRequest("https://graph.facebook.com/v21.0/{$igUserId}/media", [
-                    'image_url' => $imageUrl,
+                    'image_url' => $igImageUrl,
                     'caption' => $message,
                     'access_token' => $metaToken,
                 ]);
